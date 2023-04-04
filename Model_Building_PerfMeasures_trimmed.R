@@ -2,7 +2,8 @@ library(caret)
 library(rsample)
 library(MASS)
 
-asteroid_df <- read.csv("Data/asteroid_dataset.csv")
+
+asteroid_df <- read.csv("Data/asteroid_dataset_trimmed.csv")
 asteroid_df$class_var <- factor(asteroid_df$class_var)
 features <- colnames(asteroid_df)[-36]
 
@@ -12,9 +13,9 @@ features <- colnames(asteroid_df)[-36]
 # 2. Random Forest
 # 3. NNet
 # 4. Bagged Adaboost
-# 5. Bagged CART
+# 5. SVM - Radial
 
-set.seed(1)
+set.seed(31)
 
 # First, we will run all algorithms on all variables
 
@@ -33,7 +34,8 @@ model_rpart <- train(class_var ~ ., data = train,
                      tuneLength = 10)
 
 test_pred_rpart <- predict(model_rpart, newdata = test)
-confusionMatrix(test_pred_rpart, test$class_var)
+confusionMatrix(test_pred_rpart, test$class_var, mode = "everything")
+
 
 
 # Random Forest
@@ -54,7 +56,7 @@ rfFit <- train(x = train[features],
                trControl = train_control_RF)
 
 pred_RF <- predict(rfFit, test)
-confusionMatrix(pred_RF, test$class_var)
+confusionMatrix(pred_RF, test$class_var, mode = "everything")
 
 # NNet
 
@@ -77,19 +79,19 @@ nnetFit <- train(x = train[features],
                  trControl = train_control_Nnet)
 
 test_pred_nnet <- predict(nnetFit, newdata = test)
-confusionMatrix(test_pred_nnet, test$class_var)
+confusionMatrix(test_pred_nnet, test$class_var, mode = "everything")
 
 # Bagged CART
 
-train_control <- trainControl(method = "repeatedcv", number = 10, 
-                              summaryFunction = defaultSummary)
+#train_control <- trainControl(method = "repeatedcv", number = 10, 
+#                              summaryFunction = defaultSummary)
 
-model_treebag <- train(class_var ~ ., data = train, method = "treebag", 
-                   trControl = train_control,
-                   tuneLength = 4)
+#model_treebag <- train(class_var ~ ., data = train, method = "treebag", 
+#                   trControl = train_control,
+#                   tuneLength = 4)
 
-test_pred_treebag <- predict(model_treebag, newdata = test)
-confusionMatrix(test_pred_treebag, test$class_var)
+#test_pred_treebag <- predict(model_treebag, newdata = test)
+#confusionMatrix(test_pred_treebag, test$class_var)
 
 # Bagged AdaBoost
 
@@ -101,13 +103,27 @@ model_adaboost <- train(class_var ~ ., data = train, method = "AdaBag",
                   trControl = train_control_SVM)
 
 test_pred_adaboost <- predict(model_adaboost, newdata = test)
-confusionMatrix(test_pred_adaboost, test$class_var)
+confusionMatrix(test_pred_adaboost, test$class_var, mode = "everything")
+
+# SVM-radial
+
+train_control <- trainControl(method = "repeatedcv", number = 10, repeats = 3, 
+                              summaryFunction = defaultSummary)
+svmGrid <-  expand.grid(sigma = 0.1, C = 1.0)
+
+SVM_model <- train(class_var ~ ., data = asteroid_df, method = "svmRadial",
+               preProc = c("center", "scale"),
+               trControl = train_control, tuneGrid = svmGrid)
+test_pred_svm <- predict(SVM_model, newdata = test)
+confusionMatrix(test_pred_svm, test$class_var, mode = "everything")
+
 
 
 
 ##### Running all algorithms with top 8 variables according to - Fisher Score #####
 
-features_fisher <- c("albedo", "a", "q", "moid", "ad", "per", "n", "moid_jup", "class_var")
+features_fisher <- c("diameter", "tp", "e",  "ma",   "moid",  "H", "per", "sigma_tp",
+                     "a","sigma_e", "class_var")
 
 train_fisher <- train[features_fisher]
 test_fisher <- test[features_fisher]
@@ -119,7 +135,7 @@ model_rpart_fisher <- train(class_var ~ ., data = train_fisher,
                      tuneLength = 10)
 
 test_pred_rpart_fisher <- predict(model_rpart_fisher, newdata = test_fisher)
-confusionMatrix(test_pred_rpart_fisher, test_fisher$class_var)
+confusionMatrix(test_pred_rpart_fisher, test_fisher$class_var, mode = "everything")
 
 # Random Forest
 
@@ -134,7 +150,7 @@ rfFit_fisher <- train(x = train_fisher[-9],
                trControl = train_control_RF)
 
 pred_RF_fisher <- predict(rfFit_fisher, test_fisher)
-confusionMatrix(pred_RF_fisher, test_fisher$class_var)
+confusionMatrix(pred_RF_fisher, test_fisher$class_var, mode = "everything")
 
 # NNet
 
@@ -150,16 +166,15 @@ nnetFit_fisher <- train(x = train_fisher[-9],
                  trControl = train_control_Nnet)
 
 test_pred_nnet_fisher <- predict(nnetFit_fisher, newdata = test_fisher)
-confusionMatrix(test_pred_nnet_fisher, test_fisher$class_var)
+confusionMatrix(test_pred_nnet_fisher, test_fisher$class_var, mode = "everything")
 
-# Bagged CART
+# SVM Radial
 
-model_treebag_fisher <- train(class_var ~ ., data = train_fisher, method = "treebag", 
-                       trControl = train_control,
-                       tuneLength = 4)
-
-test_pred_treebag_fisher <- predict(model_treebag_fisher, newdata = test_fisher)
-confusionMatrix(test_pred_treebag_fisher, test_fisher$class_var)
+SVM_model_fisher <- train(class_var ~ ., data = train_fisher, method = "svmRadial",
+                   preProc = c("center", "scale"),
+                   trControl = train_control, tuneGrid = svmGrid)
+test_pred_svm_fisher <- predict(SVM_model_fisher, newdata = test_fisher)
+confusionMatrix(test_pred_svm_fisher, test_fisher$class_var, mode = "everything")
 
 # Bagged ADAboost
 
@@ -167,12 +182,13 @@ model_adaboost_fisher <- train(class_var ~ ., data = train_fisher, method = "Ada
                         trControl = train_control_SVM)
 
 test_pred_adaboost_fisher <- predict(model_adaboost_fisher, newdata = test_fisher)
-confusionMatrix(test_pred_adaboost_fisher, test_fisher$class_var)
+confusionMatrix(test_pred_adaboost_fisher, test_fisher$class_var, mode = "everything")
 
 
 ##### Running all algorithms with top 8 variables according to - RF-accuracy #####
 
-features_rfacc <- c("diameter", "albedo", "a", "n", "per", "t_jup", "sigma_a", "sigma_per", "class_var")
+features_rfacc <- c("H",        "diameter", "e",        "ad",       "tp",       "per",      "moid",     "moid_jup",
+                    "sigma_e",  "sigma_tp", "class_var")
 
 train_rfacc <- train[features_rfacc]
 test_rfacc <- test[features_rfacc]
@@ -184,7 +200,7 @@ model_rpart_rfacc <- train(class_var ~ ., data = train_rfacc,
                             tuneLength = 10)
 
 test_pred_rpart_rfacc <- predict(model_rpart_rfacc, newdata = test_rfacc)
-confusionMatrix(test_pred_rpart_rfacc, test_rfacc$class_var)
+confusionMatrix(test_pred_rpart_rfacc, test_rfacc$class_var, mode = "everything")
 
 # Random Forest
 
@@ -199,7 +215,7 @@ rfFit_rfacc <- train(x = train_rfacc[-9],
                       trControl = train_control_RF)
 
 pred_RF_rfacc <- predict(rfFit_rfacc, test_rfacc)
-confusionMatrix(pred_RF_rfacc, test_rfacc$class_var)
+confusionMatrix(pred_RF_rfacc, test_rfacc$class_var, mode = "everything")
 
 # NNet
 
@@ -215,16 +231,16 @@ nnetFit_rfacc <- train(x = train_rfacc[-9],
                         trControl = train_control_Nnet)
 
 test_pred_nnet_rfacc <- predict(nnetFit_rfacc, newdata = test_rfacc)
-confusionMatrix(test_pred_nnet_rfacc, test_rfacc$class_var)
+confusionMatrix(test_pred_nnet_rfacc, test_rfacc$class_var, mode = "everything")
 
-# Bagged CART
+# SVM Radial
 
-model_treebag_rfacc <- train(class_var ~ ., data = train_rfacc, method = "treebag", 
-                              trControl = train_control,
-                              tuneLength = 4)
+SVM_model_rfacc <- train(class_var ~ ., data = train_rfacc, method = "svmRadial",
+                          preProc = c("center", "scale"),
+                          trControl = train_control, tuneGrid = svmGrid)
+test_pred_svm_rfacc <- predict(SVM_model_rfacc, newdata = test_rfacc)
+confusionMatrix(test_pred_svm_rfacc, test_rfacc$class_var, mode = "everything")
 
-test_pred_treebag_rfacc <- predict(model_treebag_rfacc, newdata = test_rfacc)
-confusionMatrix(test_pred_treebag_rfacc, test_rfacc$class_var)
 
 # Bagged ADAboost
 
@@ -232,12 +248,13 @@ model_adaboost_rfacc <- train(class_var ~ ., data = train_rfacc, method = "AdaBa
                                trControl = train_control_SVM)
 
 test_pred_adaboost_rfacc <- predict(model_adaboost_rfacc, newdata = test_rfacc)
-confusionMatrix(test_pred_adaboost_rfacc, test_rfacc$class_var)
+confusionMatrix(test_pred_adaboost_rfacc, test_rfacc$class_var, mode = "everything")
 
 
 ##### Running all algorithms with top 8 variables according to - RF-Gini #####
 
-features_rfgini <- c("diameter", "albedo", "a", "ad", "n", "per", "moid_jup", "t_jup", "class_var")
+features_rfgini <- c("X",        "H",        "diameter", "albedo",   "e",        "ma",       "ad",       "tp",      
+                     "moid",     "moid_jup", "class_var")
 
 train_rfgini <- train[features_rfgini]
 test_rfgini <- test[features_rfgini]
@@ -249,7 +266,7 @@ model_rpart_rfgini <- train(class_var ~ ., data = train_rfgini,
                            tuneLength = 10)
 
 test_pred_rpart_rfgini <- predict(model_rpart_rfgini, newdata = test_rfgini)
-confusionMatrix(test_pred_rpart_rfgini, test_rfgini$class_var)
+confusionMatrix(test_pred_rpart_rfgini, test_rfgini$class_var, mode = "everything")
 
 # Random Forest
 
@@ -264,7 +281,7 @@ rfFit_rfgini <- train(x = train_rfgini[-9],
                      trControl = train_control_RF)
 
 pred_RF_rfgini <- predict(rfFit_rfgini, test_rfgini)
-confusionMatrix(pred_RF_rfgini, test_rfgini$class_var)
+confusionMatrix(pred_RF_rfgini, test_rfgini$class_var, mode = "everything")
 
 # NNet
 
@@ -280,16 +297,15 @@ nnetFit_rfgini <- train(x = train_rfgini[-9],
                        trControl = train_control_Nnet)
 
 test_pred_nnet_rfgini <- predict(nnetFit_rfgini, newdata = test_rfgini)
-confusionMatrix(test_pred_nnet_rfgini, test_rfgini$class_var)
+confusionMatrix(test_pred_nnet_rfgini, test_rfgini$class_var, mode = "everything")
 
-# Bagged CART
+# SVM Radial
 
-model_treebag_rfgini <- train(class_var ~ ., data = train_rfgini, method = "treebag", 
-                             trControl = train_control,
-                             tuneLength = 4)
-
-test_pred_treebag_rfgini <- predict(model_treebag_rfgini, newdata = test_rfgini)
-confusionMatrix(test_pred_treebag_rfgini, test_rfgini$class_var)
+SVM_model_rfgini <- train(class_var ~ ., data = train_rfgini, method = "svmRadial",
+                         preProc = c("center", "scale"),
+                         trControl = train_control, tuneGrid = svmGrid)
+test_pred_svm_rfgini <- predict(SVM_model_rfgini, newdata = test_rfgini)
+confusionMatrix(test_pred_svm_rfgini, test_rfgini$class_var, mode = "everything")
 
 # Bagged ADAboost
 
@@ -297,12 +313,13 @@ model_adaboost_rfgini <- train(class_var ~ ., data = train_rfgini, method = "Ada
                               trControl = train_control_SVM)
 
 test_pred_adaboost_rfgini <- predict(model_adaboost_rfgini, newdata = test_rfgini)
-confusionMatrix(test_pred_adaboost_rfgini, test_rfgini$class_var)
+confusionMatrix(test_pred_adaboost_rfgini, test_rfgini$class_var, mode = "everything")
 
 
 ##### Running all algorithms with top 8 variables according to - GBM Variable Importance #####
 
-features_gbmVI <- c("albedo", "moid_jup", "n", "sigma_tp", "a", "sigma_ma", "sigma_om", "i", "class_var")
+features_gbmVI <- c("albedo",   "moid_jup", "sigma_tp", "n",        "a",        "diameter", "i",        "w",       
+                    "rms",      "t_jup", "class_var")
 
 train_gbmVI <- train[features_gbmVI]
 test_gbmVI <- test[features_gbmVI]
@@ -314,7 +331,7 @@ model_rpart_gbmVI <- train(class_var ~ ., data = train_gbmVI,
                             tuneLength = 10)
 
 test_pred_rpart_gbmVI <- predict(model_rpart_gbmVI, newdata = test_gbmVI)
-confusionMatrix(test_pred_rpart_gbmVI, test_gbmVI$class_var)
+confusionMatrix(test_pred_rpart_gbmVI, test_gbmVI$class_var, mode = "everything")
 
 # Random Forest
 
@@ -329,7 +346,7 @@ rfFit_gbmVI <- train(x = train_gbmVI[-9],
                       trControl = train_control_RF)
 
 pred_RF_gbmVI <- predict(rfFit_gbmVI, test_gbmVI)
-confusionMatrix(pred_RF_gbmVI, test_gbmVI$class_var)
+confusionMatrix(pred_RF_gbmVI, test_gbmVI$class_var, mode = "everything")
 
 # NNet
 
@@ -345,16 +362,15 @@ nnetFit_gbmVI <- train(x = train_gbmVI[-9],
                         trControl = train_control_Nnet)
 
 test_pred_nnet_gbmVI <- predict(nnetFit_gbmVI, newdata = test_gbmVI)
-confusionMatrix(test_pred_nnet_gbmVI, test_gbmVI$class_var)
+confusionMatrix(test_pred_nnet_gbmVI, test_gbmVI$class_var, mode = "everything")
 
-# Bagged CART
+# SVM Radial
 
-model_treebag_gbmVI <- train(class_var ~ ., data = train_gbmVI, method = "treebag", 
-                              trControl = train_control,
-                              tuneLength = 4)
-
-test_pred_treebag_gbmVI <- predict(model_treebag_gbmVI, newdata = test_gbmVI)
-confusionMatrix(test_pred_treebag_gbmVI, test_gbmVI$class_var)
+SVM_model_gbmVI <- train(class_var ~ ., data = train_gbmVI, method = "svmRadial",
+                         preProc = c("center", "scale"),
+                         trControl = train_control, tuneGrid = svmGrid)
+test_pred_svm_gbmVI <- predict(SVM_model_gbmVI, newdata = test_gbmVI)
+confusionMatrix(test_pred_svm_gbmVI, test_gbmVI$class_var, mode = "everything")
 
 # Bagged ADAboost
 
@@ -362,13 +378,14 @@ model_adaboost_gbmVI <- train(class_var ~ ., data = train_gbmVI, method = "AdaBa
                                trControl = train_control_SVM)
 
 test_pred_adaboost_gbmVI <- predict(model_adaboost_gbmVI, newdata = test_gbmVI)
-confusionMatrix(test_pred_adaboost_gbmVI, test_gbmVI$class_var)
+confusionMatrix(test_pred_adaboost_gbmVI, test_gbmVI$class_var, mode = "everything")
 
 
 
 ##### Running all algorithms with top 8 variables according to - SVM Variable Importance #####
 
-features_svmVI <- c("albedo", "diameter", "q", "moid", "ad", "a", "n", "per", "class_var")
+features_svmVI <- c("albedo",   "diameter", "rms",      "ad",       "moid_jup", "sigma_ma", "a",        "n",       
+                    "per",      "t_jup", "class_var")
 
 train_svmVI <- train[features_svmVI]
 test_svmVI <- test[features_svmVI]
@@ -380,7 +397,7 @@ model_rpart_svmVI <- train(class_var ~ ., data = train_svmVI,
                            tuneLength = 10)
 
 test_pred_rpart_svmVI <- predict(model_rpart_svmVI, newdata = test_svmVI)
-confusionMatrix(test_pred_rpart_svmVI, test_svmVI$class_var)
+confusionMatrix(test_pred_rpart_svmVI, test_svmVI$class_var, mode = "everything")
 
 # Random Forest
 
@@ -395,7 +412,7 @@ rfFit_svmVI <- train(x = train_svmVI[-9],
                      trControl = train_control_RF)
 
 pred_RF_svmVI <- predict(rfFit_svmVI, test_svmVI)
-confusionMatrix(pred_RF_svmVI, test_svmVI$class_var)
+confusionMatrix(pred_RF_svmVI, test_svmVI$class_var, mode = "everything")
 
 # NNet
 
@@ -411,16 +428,15 @@ nnetFit_svmVI <- train(x = train_svmVI[-9],
                        trControl = train_control_Nnet)
 
 test_pred_nnet_svmVI <- predict(nnetFit_svmVI, newdata = test_svmVI)
-confusionMatrix(test_pred_nnet_svmVI, test_svmVI$class_var)
+confusionMatrix(test_pred_nnet_svmVI, test_svmVI$class_var, mode = "everything")
 
-# Bagged CART
+# SVM Radial
 
-model_treebag_svmVI <- train(class_var ~ ., data = train_svmVI, method = "treebag", 
-                             trControl = train_control,
-                             tuneLength = 4)
-
-test_pred_treebag_svmVI <- predict(model_treebag_svmVI, newdata = test_svmVI)
-confusionMatrix(test_pred_treebag_svmVI, test_svmVI$class_var)
+SVM_model_svmVI <- train(class_var ~ ., data = train_svmVI, method = "svmRadial",
+                         preProc = c("center", "scale"),
+                         trControl = train_control, tuneGrid = svmGrid)
+test_pred_svm_svmVI <- predict(SVM_model_svmVI, newdata = test_svmVI)
+confusionMatrix(test_pred_svm_svmVI, test_svmVI$class_var, mode = "everything")
 
 # Bagged ADAboost
 
@@ -428,4 +444,5 @@ model_adaboost_svmVI <- train(class_var ~ ., data = train_svmVI, method = "AdaBa
                               trControl = train_control_SVM)
 
 test_pred_adaboost_svmVI <- predict(model_adaboost_svmVI, newdata = test_svmVI)
-confusionMatrix(test_pred_adaboost_svmVI, test_svmVI$class_var)
+confusionMatrix(test_pred_adaboost_svmVI, test_svmVI$class_var, mode = "everything")
+
