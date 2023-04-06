@@ -3,6 +3,9 @@ library(randomForest)
 library(caret)
 library(gbm)
 
+set.seed(31)
+
+## Data Pre-processing
 
 asteroid_df <- read.csv("Data/asteroid_dataset.csv")
 
@@ -16,7 +19,8 @@ asteroid_df_trimmed$class_var <- factor(asteroid_df_trimmed$class_var)
 features <- colnames(asteroid_df_trimmed)[-36]
 asteroid_feature_matrix <- as.matrix(asteroid_df_trimmed[features])
 
-set.seed(1)
+
+## Feature Selection
 
 # Fisher Score Variables
 Fisher_index <- do.fscore(asteroid_feature_matrix, as.vector(asteroid_df_trimmed$class_var), ndim = 10)$featidx
